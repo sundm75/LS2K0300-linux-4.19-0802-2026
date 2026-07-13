@@ -7,7 +7,7 @@
  * @Description:
  *
  * Copyright (c) 2024 by ilikara 3435193369@qq.com, All Rights Reserved.
- */
+ */ 
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -19,6 +19,7 @@
 #include <linux/ioport.h>
 #include <linux/io.h>
 #include <linux/platform_device.h>
+#include <linux/atmel_tc.h>
 #include <linux/pwm.h>
 #include <linux/of_device.h>
 #include <linux/slab.h>
@@ -201,33 +202,6 @@ static int ls_pwm_gtim_config(struct pwm_chip *chip, struct pwm_device *pwm,
 	return 0;
 }
 
-static int ls_pwm_gtim_apply(struct pwm_chip *chip, struct pwm_device *pwm,
-    struct pwm_state *state)
-{
-    bool enabled;
-    int ret;
-
-    enabled = pwm->state.enabled;
-
-    if (enabled && !state->enabled)
-    {
-        ls_pwm_gtim_disable(chip, pwm);
-        return 0;
-    }
-
-    if (state->polarity != pwm->state.polarity)
-        ls_pwm_gtim_set_polarity(chip, pwm, state->polarity);
-
-    ret = ls_pwm_gtim_config(chip, pwm, state->duty_cycle, state->period);
-    if (ret)
-        return ret;
-
-    if (!enabled && state->enabled)
-        ret = ls_pwm_gtim_enable(chip, pwm);
-
-    return ret;
-}
-
 static unsigned int ls_pwm_gtim_reg_to_ns(struct ls_pwm_gtim_chip *ls_pwm, unsigned int reg)
 {
 	unsigned long long val;
@@ -237,7 +211,7 @@ static unsigned int ls_pwm_gtim_reg_to_ns(struct ls_pwm_gtim_chip *ls_pwm, unsig
 	return val;
 }
 
-static void ls_pwm_gtim_get_state(struct pwm_chip *chip, struct pwm_device *pwm,
+void ls_pwm_gtim_get_state(struct pwm_chip *chip, struct pwm_device *pwm,
 						   struct pwm_state *state)
 {
 	struct ls_pwm_gtim_chip *ls_pwm = to_ls_pwm_gtim_chip(chip);
@@ -270,13 +244,15 @@ static void ls_pwm_gtim_get_state(struct pwm_chip *chip, struct pwm_device *pwm,
 	ls_pwm->ccer_reg = ccer_reg;
 	ls_pwm->ccr_reg[pwm->hwpwm] = readl(ls_pwm->mmio_base + GTIM_CCR(pwm->hwpwm));
 	ls_pwm->arr_reg = readl(ls_pwm->mmio_base + GTIM_ARR);
-
-	//return 0;
 }
 
 static const struct pwm_ops ls_pwm_gtim_ops = {
-    .apply = ls_pwm_gtim_apply,
+	.config = ls_pwm_gtim_config,
+	.set_polarity = ls_pwm_gtim_set_polarity,
+	.enable = ls_pwm_gtim_enable,
+	.disable = ls_pwm_gtim_disable,
 	.get_state = ls_pwm_gtim_get_state,
+	.owner = THIS_MODULE,
 };
 
 static int ls_pwm_gtim_probe(struct platform_device *pdev)
@@ -298,6 +274,7 @@ static int ls_pwm_gtim_probe(struct platform_device *pdev)
 
 	pwm->chip.dev = &pdev->dev;
 	pwm->chip.ops = &ls_pwm_gtim_ops;
+	pwm->chip.base = -1;
 	pwm->chip.npwm = 4;
 
 	if (!(of_property_read_u32(np, "clock-frequency", &clk)))
@@ -337,9 +314,12 @@ static int ls_pwm_gtim_probe(struct platform_device *pdev)
 static int ls_pwm_gtim_remove(struct platform_device *pdev)
 {
 	struct ls_pwm_gtim_chip *pwm = platform_get_drvdata(pdev);
+	int err;
 	if (!pwm)
 		return -ENODEV;
-	pwmchip_remove(&pwm->chip);
+	err = pwmchip_remove(&pwm->chip);
+	if (err < 0)
+		return err;
 
 	return 0;
 }
