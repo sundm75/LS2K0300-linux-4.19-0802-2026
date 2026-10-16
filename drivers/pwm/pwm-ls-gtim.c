@@ -7,7 +7,7 @@
  * @Description:
  *
  * Copyright (c) 2024 by ilikara 3435193369@qq.com, All Rights Reserved.
- */ 
+ */
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -101,7 +101,7 @@ static void ls_pwm_gtim_disable(struct pwm_chip *chip, struct pwm_device *pwm)
 	u32 cr1_reg, ccmr_reg;
 
 	if (pwm->state.polarity == PWM_POLARITY_NORMAL)
-		writel(ls_pwm->arr_reg, ls_pwm->mmio_base + GTIM_CCR(pwm->hwpwm));
+		writel(ls_pwm->arr_reg + 1, ls_pwm->mmio_base + GTIM_CCR(pwm->hwpwm));
 	else if (pwm->state.polarity == PWM_POLARITY_INVERSED)
 		writel(0, ls_pwm->mmio_base + GTIM_CCR(pwm->hwpwm));
 
@@ -187,7 +187,7 @@ static int ls_pwm_gtim_config(struct pwm_chip *chip, struct pwm_device *pwm,
 
 	val0 = ls_pwm->clock_frequency * period_ns;
 	do_div(val0, NSEC_PER_SEC);
-	arr_reg = val0 < 1 ? 1 : val0;
+	arr_reg = val0 < 1 ? 1 : val0 - 1;
 
 	val1 = ls_pwm->clock_frequency * duty_ns;
 	do_div(val1, NSEC_PER_SEC);
@@ -222,7 +222,7 @@ void ls_pwm_gtim_get_state(struct pwm_chip *chip, struct pwm_device *pwm,
 	 * period_ns = arr_reg *NSEC_PER_SEC /ls_pwm->clock_frequency.
 	 */
 	arr_reg = readl(ls_pwm->mmio_base + GTIM_ARR);
-	state->period = ls_pwm_gtim_reg_to_ns(ls_pwm, arr_reg);
+	state->period = ls_pwm_gtim_reg_to_ns(ls_pwm, arr_reg + 1);
 
 	ccr_reg = readl(ls_pwm->mmio_base + GTIM_CCR(pwm->hwpwm));
 	state->duty_cycle = ls_pwm_gtim_reg_to_ns(ls_pwm, ccr_reg);

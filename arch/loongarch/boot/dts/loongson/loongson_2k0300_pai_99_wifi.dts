@@ -227,6 +227,7 @@
 
 &pwm_gtim{
     status = "okay";
+    compatible = "loongson,ls300-pwm-gtim";
     pinctrl-names = "default";
     pinctrl-0 = <&gtim2_pin_m1>, <&gtim3_pin_m1>;
 };
